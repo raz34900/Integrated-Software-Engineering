@@ -15,6 +15,7 @@ class _TemperatureAlertsScreenState extends State<TemperatureAlertsScreen> {
   List<dynamic> products = [];
   String errorMessage = '';
   String searchQuery = '';
+  bool showAlerts = false;
 
   @override
   void initState() {
@@ -91,45 +92,47 @@ class _TemperatureAlertsScreenState extends State<TemperatureAlertsScreen> {
                 ),
               Expanded(
                 child:
-                    getFilteredProducts().isEmpty
-                        ? const Center(child: Text('No temperature alerts'))
-                        : ListView.builder(
-                          itemCount: getFilteredProducts().length,
-                          itemBuilder: (context, index) {
-                            final product = getFilteredProducts()[index];
-                            final details = product['objectDetails'] ?? {};
-                            final actualTemp = details['temperature'] ?? 0;
-                            final recommendedTemp =
-                                details['recommendedTemperature'] ?? 5.0;
-                            return ListTile(
-                              leading: const Icon(
-                                Icons.thermostat,
-                                color: Colors.red,
-                              ),
-                              title: Text(
-                                product['alias'] ?? 'Unknown',
-                                style: TextStyle(
-                                  fontSize:
-                                      constraints.maxWidth > 600 ? 18 : 14,
-                                ),
-                              ),
-                              subtitle: Text(
-                                'Actual: $actualTemp°C, Recommended: $recommendedTemp°C',
-                              ),
-                              onTap:
-                                  () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (context) => ProductDetailScreen(
-                                            productId:
-                                                product['id']['objectId'],
-                                          ),
+                    showAlerts
+                        ? getFilteredProducts().isEmpty
+                            ? const Center(child: Text('No temperature alerts'))
+                            : ListView.builder(
+                              itemCount: getFilteredProducts().length,
+                              itemBuilder: (context, index) {
+                                final product = getFilteredProducts()[index];
+                                final details = product['objectDetails'] ?? {};
+                                final actualTemp = details['temperature'] ?? 0;
+                                final recommendedTemp =
+                                    details['recommendedTemperature'] ?? 5.0;
+                                return ListTile(
+                                  leading: const Icon(
+                                    Icons.thermostat,
+                                    color: Colors.red,
+                                  ),
+                                  title: Text(
+                                    product['alias'] ?? 'Unknown',
+                                    style: TextStyle(
+                                      fontSize:
+                                          constraints.maxWidth > 600 ? 18 : 14,
                                     ),
                                   ),
-                            );
-                          },
-                        ),
+                                  subtitle: Text(
+                                    'Actual: $actualTemp°C, Recommended: $recommendedTemp°C',
+                                  ),
+                                  onTap:
+                                      () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => ProductDetailScreen(
+                                                productId:
+                                                    product['id']['objectId'],
+                                              ),
+                                        ),
+                                      ),
+                                );
+                              },
+                            )
+                        : const Center(child: Text('Alerts disabled')),
               ),
             ],
           );

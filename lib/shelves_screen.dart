@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'add_object_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io' show Platform;
 
 class ShelvesScreen extends StatefulWidget {
@@ -15,7 +15,13 @@ class _ShelvesScreenState extends State<ShelvesScreen> {
   List<dynamic> shelves = [];
   String errorMessage = '';
   String searchQuery = '';
-  String? token;
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchShelves();
+  }
 
   String getBaseUrl() {
     if (Platform.isAndroid) {
@@ -27,48 +33,41 @@ class _ShelvesScreenState extends State<ShelvesScreen> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    // קח טוקן מ-LoginScreen (עדכן את הלוגיקה)
-    token = 'your_jwt_token_here'; // החלף עם הטוקן האמיתי
-    fetchShelves();
-  }
-
   Future<void> fetchShelves() async {
+    setState(() => isLoading = true);
     try {
-      final baseUrl = getBaseUrl();
-      final response = await http
-          .get(
-            Uri.parse('$baseUrl/ambient-intelligence/objects'),
-            headers: token != null ? {'Authorization': 'Bearer $token'} : {},
-          )
-          .timeout(const Duration(seconds: 30));
-      debugPrint('ShelvesScreen - Status: ${response.statusCode}');
-      debugPrint('ShelvesScreen - Response: ${response.body}');
+      final prefs = await SharedPreferences.getInstance();
+      final systemId = prefs.getString('system_id') ?? '';
+      final userEmail = prefs.getString('user_email') ?? '';
+      final url = Uri.parse(
+        '${getBaseUrl()}/ambient-intelligence/objects?email=$userEmail',
+      );
+      print('Shelves request URL: $url');
+      final response = await http.get(
+        url,
+        headers: {'X-System-ID': systemId, 'X-User-Email': userEmail},
+      );
+      print('Shelves response status: ${response.statusCode}');
+      print('Shelves response body: ${response.body}');
       if (response.statusCode == 200) {
-        if (mounted) {
-          setState(() {
-            shelves =
-                jsonDecode(
-                  response.body,
-                ).where((item) => item['type'] == 'Shelf').toList();
-            errorMessage = '';
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            errorMessage = 'Failed to load: ${response.statusCode}';
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
         setState(() {
-          errorMessage = 'Error: $e';
+          shelves =
+              jsonDecode(
+                response.body,
+              ).where((item) => item['type'] == 'Shelf').toList();
+          errorMessage = '';
+        });
+      } else {
+        setState(() {
+          errorMessage = 'Failed to load: ${response.statusCode}';
         });
       }
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Error: $e';
+      });
+    } finally {
+      setState(() => isLoading = false);
     }
   }
 
@@ -84,21 +83,22 @@ class _ShelvesScreenState extends State<ShelvesScreen> {
         .toList();
   }
 
+  void _refreshData() {
+    fetchShelves();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Shelves')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddObjectScreen()),
-          );
-          if (mounted) {
-            fetchShelves();
-          }
-        },
-        child: const Icon(Icons.add),
+      appBar: AppBar(
+        title: const Text('Shelves'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshData,
+            tooltip: 'Refresh',
+          ),
+        ],
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -120,7 +120,9 @@ class _ShelvesScreenState extends State<ShelvesScreen> {
                 ),
               Expanded(
                 child:
-                    getFilteredShelves().isEmpty
+                    isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : getFilteredShelves().isEmpty
                         ? const Center(child: Text('No shelves found'))
                         : ListView.builder(
                           itemCount: getFilteredShelves().length,
@@ -142,7 +144,8 @@ class _ShelvesScreenState extends State<ShelvesScreen> {
                                       builder:
                                           (context) => ShelfDetailScreen(
                                             shelfId: shelf['id']['objectId'],
-                                            systemId: shelf['id']['systemID'],
+                                            systemId:
+                                                '2025b.Raz.Natanzon', // Use saved systemId
                                           ),
                                     ),
                                   ),
@@ -175,7 +178,13 @@ class ShelfDetailScreen extends StatefulWidget {
 class _ShelfDetailScreenState extends State<ShelfDetailScreen> {
   List<dynamic> products = [];
   String errorMessage = '';
-  String? token;
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchProducts();
+  }
 
   String getBaseUrl() {
     if (Platform.isAndroid) {
@@ -187,54 +196,60 @@ class _ShelfDetailScreenState extends State<ShelfDetailScreen> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    // קח טוקן מ-LoginScreen (עדכן את הלוגיקה)
-    token = 'your_jwt_token_here'; // החלף עם הטוקן האמיתי
-    fetchProducts();
-  }
-
   Future<void> fetchProducts() async {
+    setState(() => isLoading = true);
     try {
-      final baseUrl = getBaseUrl();
-      final response = await http
-          .get(
-            Uri.parse(
-              '$baseUrl/ambient-intelligence/objects/${widget.systemId}/${widget.shelfId}/children',
-            ),
-            headers: token != null ? {'Authorization': 'Bearer $token'} : {},
-          )
-          .timeout(const Duration(seconds: 30));
-      debugPrint('ShelfDetailScreen - Status: ${response.statusCode}');
-      debugPrint('ShelfDetailScreen - Response: ${response.body}');
+      final prefs = await SharedPreferences.getInstance();
+      final systemId =
+          prefs.getString('system_id') ??
+          widget.systemId; // Use passed systemId if prefs is empty
+      final userEmail = prefs.getString('user_email') ?? '';
+      final url = Uri.parse(
+        '${getBaseUrl()}/ambient-intelligence/objects/$systemId/${widget.shelfId}/children',
+      );
+      print('Products request URL: $url');
+      final response = await http.get(
+        url,
+        headers: {'X-System-ID': systemId, 'X-User-Email': userEmail},
+      );
+      print('Products response status: ${response.statusCode}');
+      print('Products response body: ${response.body}');
       if (response.statusCode == 200) {
-        if (mounted) {
-          setState(() {
-            products = jsonDecode(response.body);
-            errorMessage = '';
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            errorMessage = 'Failed to load: ${response.statusCode}';
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
         setState(() {
-          errorMessage = 'Error: $e';
+          products = jsonDecode(response.body);
+          errorMessage = '';
+        });
+      } else {
+        setState(() {
+          errorMessage = 'Failed to load: ${response.statusCode}';
         });
       }
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Error: $e';
+      });
+    } finally {
+      setState(() => isLoading = false);
     }
+  }
+
+  void _refreshData() {
+    fetchProducts();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Shelf Details')),
+      appBar: AppBar(
+        title: const Text('Shelf Details'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshData,
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
       body: LayoutBuilder(
         builder: (context, constraints) {
           return Column(
@@ -246,7 +261,9 @@ class _ShelfDetailScreenState extends State<ShelfDetailScreen> {
                 ),
               Expanded(
                 child:
-                    products.isEmpty
+                    isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : products.isEmpty
                         ? const Center(child: Text('No products on this shelf'))
                         : ListView.builder(
                           itemCount: products.length,
@@ -255,7 +272,7 @@ class _ShelfDetailScreenState extends State<ShelfDetailScreen> {
                             final details = product['objectDetails'] ?? {};
                             return ListTile(
                               title: Text(
-                                '${product['alias']} (${details['quantity']?.toString() ?? '0'})',
+                                '${product['alias']} (${details['stockLevel']?.toString() ?? '0'})',
                                 style: TextStyle(
                                   fontSize:
                                       constraints.maxWidth > 600 ? 18 : 14,

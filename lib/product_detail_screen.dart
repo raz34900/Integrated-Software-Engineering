@@ -1,122 +1,80 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProductDetailScreen extends StatefulWidget {
-  final String productId;
+  final String? productId;
+  final String? alias;
+  final List<dynamic>? instances;
 
-  const ProductDetailScreen({super.key, required this.productId});
+  const ProductDetailScreen({
+    super.key,
+    this.productId,
+    this.alias,
+    this.instances,
+  });
 
   @override
   _ProductDetailScreenState createState() => _ProductDetailScreenState();
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
-  Map<String, dynamic>? product;
-  String errorMessage = '';
-  String? token;
+  List<dynamic> instances = [];
 
   @override
   void initState() {
     super.initState();
-    // קח טוקן מ-LoginScreen
-    token = 'your_jwt_token_here'; // החלף עם הטוקן האמיתי
-    fetchProductDetails();
+    if (widget.productId != null) {
+      fetchProductDetails(widget.productId!);
+    } else if (widget.instances != null) {
+      setState(() {
+        instances = widget.instances!;
+      });
+    }
   }
 
-  Future<void> fetchProductDetails() async {
+  Future<void> fetchProductDetails(String productId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userEmail = prefs.getString('user_email') ?? '';
+    final systemId = prefs.getString('system_id') ?? '';
+    final url = Uri.parse(
+      'http://localhost:8081/ambient-intelligence/objects?email=$userEmail&id=$productId',
+    );
     try {
-      final response = await http
-          .get(
-            Uri.parse(
-              'http://localhost:8081/ambient-intelligence/objects/2025b.Raz.Natanzon/${widget.productId}', // הוספת systemID
-            ),
-            headers: token != null ? {'Authorization': 'Bearer $token'} : {},
-          )
-          .timeout(const Duration(seconds: 30));
-      debugPrint('ProductDetailScreen - Status: ${response.statusCode}');
-      debugPrint('ProductDetailScreen - Response: ${response.body}');
+      final response = await http.get(
+        url,
+        headers: {'X-System-ID': systemId, 'X-User-Email': userEmail},
+      );
       if (response.statusCode == 200) {
-        if (mounted) {
-          setState(() {
-            product = jsonDecode(response.body);
-            errorMessage = '';
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            errorMessage =
-                'Error loading product details: ${response.statusCode}';
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
+        final data = jsonDecode(response.body);
         setState(() {
-          errorMessage = 'Error: $e';
+          instances =
+              data
+                  .where((item) => item['id']['objectId'] == productId)
+                  .toList();
         });
       }
+    } catch (e) {
+      print('Error fetching product details: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Product Details')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (errorMessage.isNotEmpty)
-              Text(
-                errorMessage,
-                style: const TextStyle(color: Colors.red, fontSize: 16),
+      appBar: AppBar(title: Text('Details')),
+      body:
+          instances.isEmpty
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.builder(
+                itemCount: instances.length,
+                itemBuilder: (context, index) {
+                  final instance = instances[index];
+                  final objectId = instance['id']['objectId'] ?? 'Unknown ID';
+                  return ListTile(title: Text(objectId));
+                },
               ),
-            if (product == null && errorMessage.isEmpty)
-              const Center(child: CircularProgressIndicator()),
-            if (product != null) ...[
-              Text(
-                'Product Name: ${product!['alias'] ?? 'Unknown'}',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'objectId: ${product!['id']['objectId']}',
-                style: const TextStyle(fontSize: 16),
-              ),
-              Text(
-                'systemID: ${product!['id']['systemID']}',
-                style: const TextStyle(fontSize: 16),
-              ),
-              Text(
-                'Quantity: ${product!['objectDetails']?['quantity']?.toString() ?? '0'}',
-                style: const TextStyle(fontSize: 16),
-              ),
-              Text(
-                'Status: ${product!['status'] ?? 'Not available'}',
-                style: const TextStyle(fontSize: 16),
-              ),
-              Text(
-                'Active: ${product!['active'] ? 'Yes' : 'No'}',
-                style: const TextStyle(fontSize: 16),
-              ),
-              Text(
-                'Craeted By: ${product!['createdBy']?['userId']?['email'] ?? 'Unknown'}',
-                style: const TextStyle(fontSize: 16),
-              ),
-              Text(
-                'Creation Timestamp: ${product!['creationTimestamp'] ?? 'Not available'}',
-                style: const TextStyle(fontSize: 16),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 }

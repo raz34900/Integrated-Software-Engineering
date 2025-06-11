@@ -32,6 +32,8 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   List<dynamic> _objects = [];
   String _errorMessage = '';
+  String userEmail =
+      'raz@gmail.com'; // TODO: Replace with actual user email**********
 
   @override
   void initState() {
@@ -42,7 +44,9 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _fetchObjects() async {
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:8081/ambient-intelligence/objects'),
+        Uri.parse(
+          'http://localhost:8081/ambient-intelligence/objects?email=$userEmail',
+        ),
       );
       if (response.statusCode == 200) {
         setState(() {

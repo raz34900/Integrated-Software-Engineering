@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io' show Platform;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 class AddObjectScreen extends StatefulWidget {
   const AddObjectScreen({super.key});
@@ -14,11 +16,11 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
   final _formKey = GlobalKey<FormState>();
   String type = 'Shelf';
   String alias = '';
-  String systemID = '';
-  String objectId = '';
-  String quantity = '';
   String errorMessage = '';
   String? token;
+  String? userEmail;
+  final String systemID = '2025b.Raz.Natanzon'; // קבוע
+  final Uuid _uuid = Uuid(); // ליצירת objectId אוטומטי
 
   String getBaseUrl() {
     if (Platform.isAndroid) {
@@ -33,12 +35,21 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
   @override
   void initState() {
     super.initState();
-    token = 'your_jwt_token_here';
+    _loadUserData();
+    token = 'your_jwt_token_here'; // החלף בטוקן אמיתי אם קיים
+  }
+
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userEmail = prefs.getString('user_email') ?? '';
+    });
   }
 
   Future<void> addObject() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final objectId = _uuid.v4(); // יצירת objectId אוטומטי
     final object = {
       'id': {'systemID': systemID, 'objectId': objectId},
       'type': type,
@@ -46,13 +57,16 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
       'status': 'active',
       'active': true,
       'createdBy': {
-        'userId': {'systemID': systemID, 'email': 'user@example.com'},
+        'userId': {
+          'systemID': systemID,
+          'email': userEmail ?? 'user@example.com',
+        },
       },
       'creationTimestamp': DateTime.now().toIso8601String(),
       'objectDetails':
           type == 'Product'
-              ? {'quantity': int.parse(quantity.isNotEmpty ? quantity : '0')}
-              : {},
+              ? {'quantity': 1}
+              : {}, // כמות ברירת מחדל 1 עבור מוצר
     };
 
     try {
@@ -66,21 +80,25 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
         body: jsonEncode(object),
       );
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Object added successfully')),
         );
-        Navigator.pop(context);
+        Navigator.pop(context); // חזרה למסך הראשי
       } else {
         setState(() {
           errorMessage =
               'Cannot add new object: ${response.statusCode} - ${response.body}';
         });
+        print(
+          'Failed response: ${response.statusCode} - ${response.body}',
+        ); // דיבאגינג
       }
     } catch (e) {
       setState(() {
         errorMessage = 'Error: $e';
       });
+      print('Exception: $e'); // דיבאגינג
     }
   }
 
@@ -108,32 +126,6 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
                 onChanged: (value) => alias = value,
                 validator: (value) => value!.isEmpty ? 'Name Required' : null,
               ),
-              TextFormField(
-                decoration: const InputDecoration(
-                  labelText: 'מזהה מערכת (System ID)',
-                ),
-                onChanged: (value) => systemID = value,
-                validator:
-                    (value) => value!.isEmpty ? 'SystemID Required' : null,
-              ),
-              TextFormField(
-                decoration: const InputDecoration(
-                  labelText: 'Object ID(Object ID)',
-                ),
-                onChanged: (value) => objectId = value,
-                validator:
-                    (value) => value!.isEmpty ? 'ObjectID Required' : null,
-              ),
-              if (type == 'Product')
-                TextFormField(
-                  decoration: const InputDecoration(
-                    labelText: 'Quantity (Quantity)',
-                  ),
-                  keyboardType: TextInputType.number,
-                  onChanged: (value) => quantity = value,
-                  validator:
-                      (value) => value!.isEmpty ? 'Quantity Required' : null,
-                ),
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: addObject,
