@@ -19,8 +19,8 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
   String errorMessage = '';
   String? token;
   String? userEmail;
-  final String systemID = '2025b.Raz.Natanzon'; // קבוע
-  final Uuid _uuid = Uuid(); // ליצירת objectId אוטומטי
+  final String systemID = '2025b.Raz.Natanzon';
+  final Uuid _uuid = Uuid();
 
   String getBaseUrl() {
     if (Platform.isAndroid) {
@@ -36,7 +36,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
   void initState() {
     super.initState();
     _loadUserData();
-    token = 'your_jwt_token_here'; // החלף בטוקן אמיתי אם קיים
+    token = 'your_jwt_token_here';
   }
 
   Future<void> _loadUserData() async {
@@ -49,7 +49,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
   Future<void> addObject() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final objectId = _uuid.v4(); // יצירת objectId אוטומטי
+    final objectId = _uuid.v4();
     final object = {
       'id': {'systemID': systemID, 'objectId': objectId},
       'type': type,
@@ -63,10 +63,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
         },
       },
       'creationTimestamp': DateTime.now().toIso8601String(),
-      'objectDetails':
-          type == 'Product'
-              ? {'quantity': 1}
-              : {}, // כמות ברירת מחדל 1 עבור מוצר
+      'objectDetails': type == 'Product' ? {'quantity': 1} : {},
     };
 
     try {
@@ -84,21 +81,19 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Object added successfully')),
         );
-        Navigator.pop(context); // חזרה למסך הראשי
+        Navigator.pop(context);
       } else {
         setState(() {
           errorMessage =
               'Cannot add new object: ${response.statusCode} - ${response.body}';
         });
-        print(
-          'Failed response: ${response.statusCode} - ${response.body}',
-        ); // דיבאגינג
+        print('Failed response: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       setState(() {
         errorMessage = 'Error: $e';
       });
-      print('Exception: $e'); // דיבאגינג
+      print('Exception: $e');
     }
   }
 

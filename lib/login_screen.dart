@@ -169,7 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () async {
-                String selectedRole = 'END_USER'; // ברירת מחדל
+                String selectedRole = 'END_USER';
                 final emailController = TextEditingController();
                 final usernameController = TextEditingController();
                 final avatarController = TextEditingController();
