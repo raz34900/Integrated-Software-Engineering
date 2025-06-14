@@ -26,8 +26,6 @@ class _ShelvesScreenState extends State<ShelvesScreen> {
   String getBaseUrl() {
     if (Platform.isAndroid) {
       return 'http://10.0.2.2:8081';
-    } else if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
-      return 'http://localhost:8081';
     } else {
       return 'http://localhost:8081';
     }
@@ -40,7 +38,7 @@ class _ShelvesScreenState extends State<ShelvesScreen> {
       final systemId = prefs.getString('system_id') ?? '';
       final userEmail = prefs.getString('user_email') ?? '';
       final url = Uri.parse(
-        '${getBaseUrl()}/ambient-intelligence/objects?email=$userEmail',
+        '${getBaseUrl()}/ambient-intelligence/objects/search/byType/Shelf?systemID=$systemId&email=$userEmail',
       );
       print('Shelves request URL: $url');
       final response = await http.get(
@@ -48,14 +46,15 @@ class _ShelvesScreenState extends State<ShelvesScreen> {
         headers: {'X-System-ID': systemId, 'X-User-Email': userEmail},
       );
       print('Shelves response status: ${response.statusCode}');
-      print('Shelves response body: ${response.body}');
       if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
         setState(() {
-          shelves =
-              jsonDecode(
-                response.body,
-              ).where((item) => item['type'] == 'Shelf').toList();
+          shelves = data;
           errorMessage = '';
+        });
+      } else if (response.statusCode == 403) {
+        setState(() {
+          errorMessage = 'Only end users can reach this';
         });
       } else {
         setState(() {
@@ -73,19 +72,13 @@ class _ShelvesScreenState extends State<ShelvesScreen> {
 
   List<dynamic> getFilteredShelves() {
     return shelves
-        .where(
-          (shelf) =>
-              shelf['alias']?.toLowerCase().contains(
-                searchQuery.toLowerCase(),
-              ) ??
-              false,
-        )
+        .where((shelf) =>
+            shelf['alias']?.toLowerCase().contains(searchQuery.toLowerCase()) ??
+            false)
         .toList();
   }
 
-  void _refreshData() {
-    fetchShelves();
-  }
+  void _refreshData() => fetchShelves();
 
   @override
   Widget build(BuildContext context) {
@@ -100,62 +93,48 @@ class _ShelvesScreenState extends State<ShelvesScreen> {
           ),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: TextField(
-                  onChanged: (value) => setState(() => searchQuery = value),
-                  decoration: const InputDecoration(
-                    labelText: 'Search by Shelf Name',
-                  ),
-                ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              onChanged: (value) => setState(() => searchQuery = value),
+              decoration: const InputDecoration(
+                labelText: 'Search by Shelf Name',
               ),
-              if (errorMessage.isNotEmpty)
-                Text(
-                  errorMessage,
-                  style: const TextStyle(color: Colors.red, fontSize: 16),
-                ),
-              Expanded(
-                child:
-                    isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : getFilteredShelves().isEmpty
-                        ? const Center(child: Text('No shelves found'))
-                        : ListView.builder(
-                          itemCount: getFilteredShelves().length,
-                          itemBuilder: (context, index) {
-                            final shelf = getFilteredShelves()[index];
-                            return ListTile(
-                              leading: const Icon(Icons.store),
-                              title: Text(
-                                shelf['alias'] ?? 'Unknown Shelf',
-                                style: TextStyle(
-                                  fontSize:
-                                      constraints.maxWidth > 600 ? 18 : 14,
+            ),
+          ),
+          if (errorMessage.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(errorMessage, style: const TextStyle(color: Colors.red)),
+            ),
+          Expanded(
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : getFilteredShelves().isEmpty
+                    ? const Center(child: Text('No shelves found'))
+                    : ListView.builder(
+                        itemCount: getFilteredShelves().length,
+                        itemBuilder: (context, index) {
+                          final shelf = getFilteredShelves()[index];
+                          return ListTile(
+                            leading: const Icon(Icons.store),
+                            title: Text(shelf['alias'] ?? 'Unknown Shelf'),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ShelfDetailScreen(
+                                  shelfId: shelf['id']['objectId'],
+                                  systemId: shelf['id']['systemID'],
                                 ),
                               ),
-                              onTap:
-                                  () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (context) => ShelfDetailScreen(
-                                            shelfId: shelf['id']['objectId'],
-                                            systemId:
-                                                '2025b.Raz.Natanzon', // Use saved systemId
-                                          ),
-                                    ),
-                                  ),
-                            );
-                          },
-                        ),
-              ),
-            ],
-          );
-        },
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
       ),
     );
   }
@@ -189,8 +168,6 @@ class _ShelfDetailScreenState extends State<ShelfDetailScreen> {
   String getBaseUrl() {
     if (Platform.isAndroid) {
       return 'http://10.0.2.2:8081';
-    } else if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
-      return 'http://localhost:8081';
     } else {
       return 'http://localhost:8081';
     }
@@ -200,20 +177,16 @@ class _ShelfDetailScreenState extends State<ShelfDetailScreen> {
     setState(() => isLoading = true);
     try {
       final prefs = await SharedPreferences.getInstance();
-      final systemId =
-          prefs.getString('system_id') ??
-          widget.systemId; // Use passed systemId if prefs is empty
       final userEmail = prefs.getString('user_email') ?? '';
       final url = Uri.parse(
-        '${getBaseUrl()}/ambient-intelligence/objects/$systemId/${widget.shelfId}/children?email=$userEmail',
+        '${getBaseUrl()}/ambient-intelligence/objects/${widget.systemId}/${widget.shelfId}/children?email=$userEmail',
       );
       print('Products request URL: $url');
       final response = await http.get(
         url,
-        headers: {'X-System-ID': systemId, 'X-User-Email': userEmail},
+        headers: {'X-System-ID': widget.systemId, 'X-User-Email': userEmail},
       );
       print('Products response status: ${response.statusCode}');
-      print('Products response body: ${response.body}');
       if (response.statusCode == 200) {
         setState(() {
           products = jsonDecode(response.body);
@@ -233,9 +206,7 @@ class _ShelfDetailScreenState extends State<ShelfDetailScreen> {
     }
   }
 
-  void _refreshData() {
-    fetchProducts();
-  }
+  void _refreshData() => fetchProducts();
 
   @override
   Widget build(BuildContext context) {
@@ -250,41 +221,34 @@ class _ShelfDetailScreenState extends State<ShelfDetailScreen> {
           ),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return Column(
-            children: [
-              if (errorMessage.isNotEmpty)
-                Text(
-                  errorMessage,
-                  style: const TextStyle(color: Colors.red, fontSize: 16),
-                ),
-              Expanded(
-                child:
-                    isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : products.isEmpty
-                        ? const Center(child: Text('No products on this shelf'))
-                        : ListView.builder(
-                          itemCount: products.length,
-                          itemBuilder: (context, index) {
-                            final product = products[index];
-                            final details = product['objectDetails'] ?? {};
-                            return ListTile(
-                              title: Text(
-                                '${product['alias']} (${details['stockLevel']?.toString() ?? '0'})',
-                                style: TextStyle(
-                                  fontSize:
-                                      constraints.maxWidth > 600 ? 18 : 14,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-              ),
-            ],
-          );
-        },
+      body: Column(
+        children: [
+          if (errorMessage.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(errorMessage, style: const TextStyle(color: Colors.red)),
+            ),
+          Expanded(
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : products.isEmpty
+                    ? const Center(child: Text('No products on this shelf'))
+                    : ListView.builder(
+                        itemCount: products.length,
+                        itemBuilder: (context, index) {
+                          final product = products[index];
+                          final details = product['objectDetails'] ?? {};
+                          final alias = product['alias'] ?? 'Unknown';
+                          final nfcTag = details['nfcTag'] ?? 'Not assigned';
+                          return ListTile(
+                            leading: const Icon(Icons.inventory_2),
+                            title: Text('$alias'),
+                            subtitle: Text('NFC Tag: $nfcTag'),
+                          );
+                        },
+                      ),
+          ),
+        ],
       ),
     );
   }

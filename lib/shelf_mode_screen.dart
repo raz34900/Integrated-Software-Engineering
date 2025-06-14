@@ -30,47 +30,45 @@ class _ShelfModeScreenState extends State<ShelfModeScreen> {
   }
 
   Future<void> _fetchShelves() async {
-    print('>>> Fetching shelves...');
-    setState(() => _isLoading = true);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final systemId = prefs.getString('system_id') ?? '';
-      final userEmail = prefs.getString('user_email') ?? '';
-      final url = Uri.parse(
-        '${getBaseUrl()}/ambient-intelligence/objects?email=end@test.com',
-      );
-      print('>>> Shelves URL: $url');
-      print('>>> Headers: X-System-ID: $systemId, X-User-Email: $userEmail');
+  print('>>> Fetching shelves via search API...');
+  setState(() => _isLoading = true);
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final systemId = prefs.getString('system_id') ?? '';
+    final userEmail = prefs.getString('user_email') ?? '';
+    final url = Uri.parse(
+      '${getBaseUrl()}/ambient-intelligence/objects/search/byType/Shelf?systemID=$systemId&email=operator@test.com',
+    );
 
-      final response = await http.get(
-        url,
-        headers: {'X-System-ID': systemId, 'X-User-Email': userEmail},
-      );
+    print('>>> Shelves URL: $url');
+    final response = await http.get(
+      url,
+      headers: {'X-System-ID': systemId, 'X-User-Email': "operator@test.com"},
+    );
 
-      print('>>> Shelves response status: ${response.statusCode}');
-      print('>>> Shelves response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _shelves = data.where((item) => item['type'] == 'Shelf').toList();
-          _errorMessage = '';
-        });
-        print('>>> Fetched ${_shelves.length} shelves.');
-      } else {
-        setState(() {
-          _errorMessage = 'Failed to load shelves: ${response.statusCode}';
-        });
-      }
-    } catch (e) {
+    print('>>> Shelves response status: ${response.statusCode}');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
       setState(() {
-        _errorMessage = 'Error: $e';
+        _shelves = data;
+        _errorMessage = '';
       });
-      print('>>> Error fetching shelves: $e');
-    } finally {
-      setState(() => _isLoading = false);
+      print('>>> Fetched ${_shelves.length} shelves.');
+    } else {
+      setState(() {
+        _errorMessage = 'Failed to load shelves: ${response.statusCode}';
+      });
     }
+  } catch (e) {
+    setState(() {
+      _errorMessage = 'Error: $e';
+    });
+    print('>>> Error fetching shelves: $e');
+  } finally {
+    setState(() => _isLoading = false);
   }
+}
+
 
   Future<void> _scanNfcAndSendCommand() async {
     if (_selectedShelf == null) {

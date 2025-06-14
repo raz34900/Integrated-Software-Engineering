@@ -250,7 +250,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   );
                 }
               },
-              child: const Text('Add User'),
+              child: const Text('Create User'),
             ),
             const SizedBox(height: 16),
             ElevatedButton(

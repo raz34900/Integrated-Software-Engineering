@@ -110,28 +110,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 final instance = instances[index];
                 final objectId = instance['id']['objectId'] ?? 'Unknown ID';
                 final systemId = instance['id']['systemID'] ?? 'Unknown System';
-                final nfcTag = instance['objectDetails']?['nfcTag'] ?? 'None';
 
                 return ListTile(
-  title: Text('Alias: ${widget.alias ?? 'Unknown'}\nObjectId: $objectId'),
-  subtitle: Text('Current NFC Tag: $nfcTag'),
-  trailing: IconButton(
-    icon: const Icon(Icons.add),
-    tooltip: 'Assign NFC Tag',
-    onPressed: () async {
-      final prefs = await SharedPreferences.getInstance();
-      final userEmail = prefs.getString('user_email') ?? 'end@g.com';
+                  title: Text('Alias: ${widget.alias ?? 'Unknown'}\nObjectId: $objectId'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.add),
+                    tooltip: 'Assign NFC Tag',
+                    onPressed: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      final userEmail = prefs.getString('user_email') ?? 'end@g.com';
 
-      await sendPendingAction(
-        userEmail: userEmail,
-        targetSystemId: systemId,
-        targetObjectId: objectId,
-        context: context,
-      );
-    },
-  ),
-);
-
+                      await sendPendingAction(
+                        userEmail: userEmail,
+                        targetSystemId: systemId,
+                        targetObjectId: objectId,
+                        context: context,
+                      );
+                    },
+                  ),
+                );
               },
             ),
     );
