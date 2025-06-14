@@ -13,95 +13,83 @@ class LowStockScreen extends StatefulWidget {
 }
 
 class _LowStockScreenState extends State<LowStockScreen> {
-  List<dynamic> products = [];
-  String errorMessage = '';
   Map<String, int> lowStockCount = {};
+  String errorMessage = '';
   static int totalAlerts = 0;
 
   @override
   void initState() {
     super.initState();
-    fetchLowStockProducts();
+    fetchLowStockViaCommand();
   }
 
-  Future<void> fetchLowStockProducts() async {
+  Future<void> fetchLowStockViaCommand() async {
     final prefs = await SharedPreferences.getInstance();
     final userEmail = prefs.getString('user_email') ?? '';
+    final systemId = prefs.getString('system_id') ?? '';
+
+    final commandPayload = {
+      "id": {
+        "systemID": systemId,
+        "commandId": "checkLowStock-${DateTime.now().millisecondsSinceEpoch}"
+      },
+      "command": "check_low_stock",
+      "targetObject": {
+        "id": {"systemID": "dummy", "objectId": "dummy0"}
+      },
+      "invokedBy": {
+        "userId": {"systemID": systemId, "email": "end@test.com"}
+      },
+      "invocationTimestamp": DateTime.now().toUtc().toIso8601String(),
+      "commandAttributes": {"threshold": 3}
+    };
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          'http://localhost:8081/ambient-intelligence/objects?email=$userEmail',
-        ),
+      final response = await http.post(
+        Uri.parse('http://localhost:8081/ambient-intelligence/commands'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(commandPayload),
       );
-      if (response.statusCode == 200) {
-        final allProducts = jsonDecode(response.body) as List<dynamic>;
-        setState(() {
-          //quantity <= 3
-          products =
-              allProducts.where((item) {
-                final details =
-                    item['objectDetails'] as Map<String, dynamic>? ?? {};
-                final quantity = details['quantity'] as int? ?? 0;
-                final matchesAlias =
-                    widget.filterAlias == null ||
-                    (item['alias']?.toLowerCase() ==
-                        widget.filterAlias?.toLowerCase());
-                return quantity <= 3 &&
-                    matchesAlias &&
-                    item['type'] == 'Product';
-              }).toList();
 
-          lowStockCount = {};
-          final uniqueAliases =
-              allProducts
-                  .where((item) => item['type'] == 'Product')
-                  .map((item) => item['alias'] as String?)
-                  .toSet()
-                  .whereType<String>();
-          for (var alias in uniqueAliases) {
-            final allInstances =
-                allProducts.where((p) => p['alias'] == alias).toList();
-            final totalInstances = allInstances.length;
-            if (totalInstances <= 3) {
-              final lowStockInstances =
-                  allInstances.where((p) {
-                    final details =
-                        p['objectDetails'] as Map<String, dynamic>? ?? {};
-                    final quantity = details['quantity'] as int? ?? 0;
-                    return quantity <= 3;
-                  }).toList();
-              lowStockCount[alias] = lowStockInstances.length;
-            }
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List<dynamic>;
+        final updatedMap = <String, int>{};
+        for (final item in data) {
+          final alias = item['alias'];
+          final count = item['count'];
+          if (alias != null && count != null) {
+            updatedMap[alias] = count;
           }
-          totalAlerts = lowStockCount.length;
+        }
+
+        setState(() {
+          lowStockCount = updatedMap;
+          totalAlerts = updatedMap.length;
           errorMessage = '';
         });
       } else {
         setState(() {
-          errorMessage = 'Failed to load: ${response.statusCode}';
-          lowStockCount = {};
+          errorMessage = 'Failed to fetch low stock: ${response.statusCode}';
           totalAlerts = 0;
         });
       }
     } catch (e) {
       setState(() {
-        errorMessage = 'Error: $e';
-        lowStockCount = {};
+        errorMessage = 'Error fetching low stock: $e';
         totalAlerts = 0;
       });
     }
   }
 
   void _refreshData() {
-    fetchLowStockProducts();
+    fetchLowStockViaCommand();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Low Stock Alerts (${totalAlerts})'),
+        title: Text('Low Stock Alerts ($totalAlerts)'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -113,40 +101,40 @@ class _LowStockScreenState extends State<LowStockScreen> {
       body: Column(
         children: [
           if (errorMessage.isNotEmpty)
-            Text(errorMessage, style: const TextStyle(color: Colors.red)),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(errorMessage, style: const TextStyle(color: Colors.red)),
+            ),
           if (lowStockCount.isNotEmpty)
-            ...lowStockCount.entries.map((entry) {
-              final alias = entry.key;
-              final count = entry.value;
-              return Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: ListTile(
-                  leading: const Icon(Icons.warning, color: Colors.red),
-                  title: Text(
-                    alias ?? 'Unknown',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+            Expanded(
+              child: ListView(
+                children: lowStockCount.entries.map((entry) {
+                  final alias = entry.key;
+                  final count = entry.value;
+
+                  return ListTile(
+                    leading: const Icon(Icons.warning, color: Colors.red),
+                    title: Text(
+                      alias,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                  ),
-                  subtitle: Text('Instances in low stock: $count'),
-                  onTap:
-                      () => Navigator.push(
+                    subtitle: Text('Instances in low stock: $count'),
+                    onTap: () {
+                      Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder:
-                              (context) => ProductDetailScreen(
-                                alias: alias,
-                                instances:
-                                    products
-                                        .where((p) => p['alias'] == alias)
-                                        .toList(),
-                              ),
+                          builder: (context) => ProductDetailScreen(
+                            alias: alias,
+                            // You may want to dynamically fetch instances for this alias
+                            instances: [],
+                          ),
                         ),
-                      ),
-                ),
-              );
-            }),
+                      );
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
           if (lowStockCount.isEmpty && errorMessage.isEmpty)
             const Center(child: Text('No low stock items found')),
         ],

@@ -63,7 +63,7 @@ class _AddObjectScreenState extends State<AddObjectScreen> {
         },
       },
       'creationTimestamp': DateTime.now().toIso8601String(),
-      'objectDetails': type == 'Product' ? {'quantity': 1} : {},
+      'objectDetails': type == 'Product' ? {'nfcTag': "Not assigned yet"} : {},
     };
 
     try {

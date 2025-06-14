@@ -46,54 +46,44 @@ class _MainScreenState extends State<MainScreen> {
     final userEmail = prefs.getString('user_email') ?? '';
     final systemId = prefs.getString('system_id') ?? '';
 
-    try {
-      final url = Uri.parse(
-        'http://localhost:8081/ambient-intelligence/objects?email=$userEmail',
-      );
-      final response = await http.get(
-        url,
-        headers: {'X-System-ID': systemId, 'X-User-Email': userEmail},
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          expiredCount = 0;
-          final uniqueAliases =
-              data
-                  .where((item) => item['type'] == 'Product')
-                  .map((item) => item['alias'] as String?)
-                  .toSet()
-                  .whereType<String>();
-          lowStockCount = 0;
-          for (var alias in uniqueAliases) {
-            final allInstances =
-                data.where((p) => p['alias'] == alias).toList();
-            final totalInstances = allInstances.length;
-            if (totalInstances <= 3) {
-              final lowStockInstances =
-                  allInstances.where((p) {
-                    final details =
-                        p['objectDetails'] as Map<String, dynamic>? ?? {};
-                    final quantity = details['quantity'] as int? ?? 0;
-                    return quantity <= 3;
-                  }).toList();
-              if (lowStockInstances.isNotEmpty) {
-                lowStockCount += 1;
-              }
-            }
+        final commandPayload = {
+          "id": {
+            "systemID": systemId,
+            "commandId": "checkLowStock-${DateTime.now().millisecondsSinceEpoch}"
+          },
+          "command": "check_low_stock",
+          "targetObject": {
+            "id": {"systemID": "dummy", "objectId": "dummy0"}
+          },
+          "invokedBy": {
+            "userId": {"systemID": systemId, "email": "end@test.com"}
+          },
+          "invocationTimestamp": DateTime.now().toUtc().toIso8601String(),
+          "commandAttributes": {"threshold": 3}
+        };
+
+        try {
+          final response = await http.post(
+            Uri.parse('http://localhost:8081/ambient-intelligence/commands'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(commandPayload),
+          );
+
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body) as List<dynamic>;
+            setState(() {
+              lowStockCount = data.length;
+              expiredCount = 0;
+              tempCount = 0;
+              locationCount = 0;
+            });
+          } else {
+            print('Failed to fetch low stock count via command: ${response.statusCode}');
           }
-          tempCount = 0;
-          locationCount = 0;
-        });
-      } else {
-        print(
-          'Failed to fetch alert counts. Status: ${response.statusCode}, Body: ${response.body}',
-        );
+        } catch (e) {
+          print('Error fetching low stock count via command: $e');
+        }
       }
-    } catch (e) {
-      print('Error fetching alert counts: $e');
-    }
-  }
 
   void _refreshData() {
     _fetchAlertCounts();
