@@ -49,10 +49,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
-          instances =
-              data
-                  .where((item) => item['id']['objectId'] == productId)
-                  .toList();
+          instances = data
+              .where((item) => item['id']['objectId'] == productId)
+              .toList();
         });
       }
     } catch (e) {
@@ -60,21 +59,81 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  Future<void> sendPendingAction({
+    required String userEmail,
+    required String targetSystemId,
+    required String targetObjectId,
+    required BuildContext context,
+  }) async {
+    final url = Uri.parse(
+        'http://localhost:8081/ambient-intelligence/pending-action');
+    final body = {
+      "userEmail": userEmail,
+      "actionType": "ASSIGN_NFC_TAG",
+      "targetSystemId": targetSystemId,
+      "targetObjectId": targetObjectId,
+    };
+
+    print('>>> Sending PendingAction: $body');
+
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+
+    print('>>> PendingAction POST status: ${response.statusCode}');
+
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('PendingAction created — scan NFC now!')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                'Error creating PendingAction: ${response.statusCode}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Details')),
-      body:
-          instances.isEmpty
-              ? const Center(child: CircularProgressIndicator())
-              : ListView.builder(
-                itemCount: instances.length,
-                itemBuilder: (context, index) {
-                  final instance = instances[index];
-                  final objectId = instance['id']['objectId'] ?? 'Unknown ID';
-                  return ListTile(title: Text(objectId));
-                },
-              ),
+      appBar:
+          AppBar(title: Text(widget.alias != null ? 'Details for ${widget.alias}' : 'Details')),
+      body: instances.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: instances.length,
+              itemBuilder: (context, index) {
+                final instance = instances[index];
+                final objectId = instance['id']['objectId'] ?? 'Unknown ID';
+                final systemId = instance['id']['systemID'] ?? 'Unknown System';
+                final nfcTag = instance['objectDetails']?['nfcTag'] ?? 'None';
+
+                return ListTile(
+  title: Text('Alias: ${widget.alias ?? 'Unknown'}\nObjectId: $objectId'),
+  subtitle: Text('Current NFC Tag: $nfcTag'),
+  trailing: IconButton(
+    icon: const Icon(Icons.add),
+    tooltip: 'Assign NFC Tag',
+    onPressed: () async {
+      final prefs = await SharedPreferences.getInstance();
+      final userEmail = prefs.getString('user_email') ?? 'end@g.com';
+
+      await sendPendingAction(
+        userEmail: userEmail,
+        targetSystemId: systemId,
+        targetObjectId: objectId,
+        context: context,
+      );
+    },
+  ),
+);
+
+              },
+            ),
     );
   }
 }

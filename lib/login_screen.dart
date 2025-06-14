@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'main_screen.dart';
+import 'shelf_mode_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -61,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.setString(
           'role',
           responseData['role'] ?? 'END_USER',
-        ); // שמירת תפקיד
+        );
         print('System ID saved: ${_systemIdController.text}');
         print('User Email saved: ${_userEmailController.text}');
         setState(() {
@@ -108,17 +109,16 @@ class _LoginScreenState extends State<LoginScreen> {
       if (response.statusCode == 200 || response.statusCode == 201) {
         showDialog(
           context: context,
-          builder:
-              (context) => AlertDialog(
-                title: const Text('Success'),
-                content: const Text('User added successfully'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('OK'),
-                  ),
-                ],
+          builder: (context) => AlertDialog(
+            title: const Text('Success'),
+            content: const Text('User added successfully'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
               ),
+            ],
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -139,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Login')),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -176,8 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 final result = await showDialog(
                   context: context,
-                  builder:
-                      (context) => StatefulBuilder(
+                  builder: (context) => StatefulBuilder(
                         builder: (context, setState) {
                           return AlertDialog(
                             title: const Text('Add New User'),
@@ -204,15 +203,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 DropdownButton<String>(
                                   value: selectedRole,
-                                  items:
-                                      ['ADMIN', 'OPERATOR', 'END_USER']
-                                          .map(
-                                            (role) => DropdownMenuItem(
-                                              value: role,
-                                              child: Text(role),
-                                            ),
-                                          )
-                                          .toList(),
+                                  items: ['ADMIN', 'OPERATOR', 'END_USER']
+                                      .map(
+                                        (role) => DropdownMenuItem(
+                                          value: role,
+                                          child: Text(role),
+                                        ),
+                                      )
+                                      .toList(),
                                   onChanged: (value) {
                                     setState(() {
                                       selectedRole = value!;
@@ -253,6 +251,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 }
               },
               child: const Text('Add User'),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ShelfModeScreen()),
+                );
+              },
+              child: const Text('Shelf Mode'),
             ),
           ],
         ),

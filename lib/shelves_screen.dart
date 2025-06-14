@@ -205,7 +205,7 @@ class _ShelfDetailScreenState extends State<ShelfDetailScreen> {
           widget.systemId; // Use passed systemId if prefs is empty
       final userEmail = prefs.getString('user_email') ?? '';
       final url = Uri.parse(
-        '${getBaseUrl()}/ambient-intelligence/objects/$systemId/${widget.shelfId}/children',
+        '${getBaseUrl()}/ambient-intelligence/objects/$systemId/${widget.shelfId}/children?email=$userEmail',
       );
       print('Products request URL: $url');
       final response = await http.get(
